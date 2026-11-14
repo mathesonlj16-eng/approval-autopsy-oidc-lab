@@ -4,7 +4,7 @@ on:
 permissions: {}
 jobs:
   build:
-    if: ${{ vars.AUTOPSY_ENABLE_OIDC_LAB == 'true' }}
+    if: ${{ vars.AUTOPSY_ENABLE_PHASE7 == 'true' }}
     permissions:
       contents: read
       id-token: write
@@ -14,13 +14,14 @@ jobs:
         with:
           persist-credentials: false
       - run: python -m pip install -r requirements.txt
-      - run: python oidc_probe.py build
+      - run: python phase7_client.py build
         env:
-          AUTOPSY_POLICY: ${{ vars.AUTOPSY_POLICY }}
+          AUTOPSY_PHASE7_URL: ${{ vars.AUTOPSY_PHASE7_URL }}
   release-identity:
     needs: build
     permissions:
       contents: read
       id-token: write
     uses: ./.github/workflows/phase6-release.yml
+
 
