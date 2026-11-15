@@ -1,0 +1,19 @@
+name: Alpha adapter release identity
+on:
+  workflow_call:
+permissions: {}
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - run: python -m pip install -r requirements.txt
+      - run: python alpha-live-client.py release
+        env:
+          AUTOPSY_ALPHA_URL: ${{ vars.AUTOPSY_ALPHA_URL }}
