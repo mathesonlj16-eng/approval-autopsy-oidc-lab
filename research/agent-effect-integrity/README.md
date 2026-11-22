@@ -6,6 +6,16 @@ Target: Microsoft's [Agent Governance Toolkit](https://github.com/microsoft/agen
 
 ## Verified results
 
+### Cross-process SQLite validation (2026-11-22)
+
+- [Full results and API migration design](../../research-outcomes/sqlite-multiprocess-atomicity-2026-11-22.md)
+- [Successful GitHub Actions run](https://github.com/mathesonlj16-eng/approval-autopsy-oidc-lab/actions/runs/45044381478)
+- Two distinct processes sharing a synthetic SQLite database: original coordinator reproduced an inconsistent approval chain in 3/3 controlled trials; transaction-patched coordinator validated successfully in 3/3 trials.
+- Abrupt worker termination after vote append: one partial record survived in the original unwrapped store, while the patched transaction rolled back the write.
+- Existing upstream protocol suite: 62/62 passed before and after patch.
+- **These are test results using a research-written SQLite store, not a demonstration against a Microsoft-supplied persistent backend or a reported vulnerability.**
+
+
 - [GitHub Actions conformance run, November 22, 2026](https://github.com/mathesonlj16-eng/approval-autopsy-oidc-lab/actions/runs/45043019954): **14/14 research cases and 62/62 unchanged upstream protocol tests passed**.
 - [Detailed research findings and limitations](../../research-outcomes/agent-effect-integrity-integration-2026-11-22.md).
 - Tests run against Microsoft's *unchanged* source code using a test-only importer; no production system was tested.
