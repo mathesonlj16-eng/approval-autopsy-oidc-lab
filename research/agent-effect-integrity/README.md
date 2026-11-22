@@ -1,25 +1,29 @@
-# Agent Effect Integrity — pinned-source conformance pilot
+# Agent Effect Integrity — source-level research pilot
 
-**Status:** reproducible research harness, not a vulnerability report. All actions and effects are synthetic.
+**Status:** reproducible synthetic research. **No unauthorized execution or confirmed security vulnerability demonstrated.**
 
-The target is Microsoft's [Agent Governance Toolkit](https://github.com/microsoft/agent-governance-toolkit), Python `agentmesh` action-bound approval protocol at pinned revision `f85abe1fffc5aaeed716a94bd6654677329215b9`.
+Target: Microsoft's [Agent Governance Toolkit](https://github.com/microsoft/agent-governance-toolkit), Python `agentmesh` action-bound approval protocol, pinned at `f85abe1fffc5aaeed716a94bd6654677329215b9`.
 
-## Test coverage
+## Verified results
 
-- Changing the exact action after approval is denied (**already covered upstream**).
-- Concurrent executions cannot consume the same approval more than once (**composition/control**).
-- Consuming approval and then simulating a crash before the synthetic effect leaves no effect, and retry is denied (**expected protocol boundary; not a vulnerability finding**).
+- [GitHub Actions conformance run, November 22, 2026](https://github.com/mathesonlj16-eng/approval-autopsy-oidc-lab/actions/runs/45043019954): **14/14 research cases and 62/62 unchanged upstream protocol tests passed**.
+- [Detailed research findings and limitations](../../research-outcomes/agent-effect-integrity-integration-2026-11-22.md).
+- Tests run against Microsoft's *unchanged* source code using a test-only importer; no production system was tested.
 
-The CI runner also executes the original upstream `test_approval_protocol.py` file unchanged as a control.
+The 14 research cases consist of 3 protocol baselines, 9 disposable SQLite effect-adapter cases, and 2 controlled parallel approval cases.
 
-## Reproduction and limitations
+The application-owned SQLite adapter enforced idempotency across new approvals after retries, lost responses, and concurrency. **That effect guarantee belongs to our adapter, not to the Microsoft protocol.**
 
-The first GitHub Actions attempt failed to install the full consolidated package because its declared `agent-control-specification>=0.4.0b0` dependency was not available from PyPI. That is an installation blocker, **not a security defect**.
+The parallel-approval experiment identified an **availability/correctness candidate** in the reference in-memory store: under a controlled two-stage interleaving, valid votes produced a terminal ALLOW resolution but execution validation returned `chain_tampered` because two entries were linked to the same predecessor snapshot. Sequential approvals validated correctly. The guard failed closed. This result has not been verified on a production storage backend or classified by upstream maintainers.
 
-The revised runner checks out the exact upstream commit and uses `research-support/agentmesh_protocol_bootstrap.py` to import only the original, unmodified approval-protocol package and its dependencies via standard Python imports, skipping the broad `agentmesh.governance` package initializer. Therefore the results apply to **the isolated protocol source**, not a fully installed or deployed Agent Governance Toolkit integration. We explicitly don't call skipped tests passes.
+## Reproduction scope
 
-GitHub Actions permissions are read-only; tests use no credentials, production tools, external writes, hosted agents, or GPUs. Runs are bounded to 15 minutes. Test logs and environment details are uploaded as artifacts where possible.
+The original attempt to install the complete consolidated core was blocked by an unpublished declared PyPI dependency. The subsequent workflow imports the exact pinned protocol source directly without modifying it, bypassing the broader package initializer. Therefore these are **source-level protocol and synthetic integration tests**, not a full installed-framework acceptance test. The upstream contribution guide documents an alternate build-from-source installation path that has not yet been exercised here.
 
-## Next step
+All tests use dummy identities, fake ticket operations, and disposable SQLite files. GitHub Actions is configured for read-only repository permissions, a bounded job runtime, and no secrets or live service connections. A simulated crash uses a deliberately injected exception, not an operating-system process kill.
 
-After successful tests, compare the observed boundary with the upstream guarantees and select a real integration-level contract to investigate. Do not file a vulnerability report based on this baseline alone.
+## Research workflow
+
+Before making any external finding claim, verify documented contracts and other backends; develop a minimal solution for concurrent approval-submission atomicity; seek independent reproduction; and obtain user approval before any contact with maintainers. For potential security vulnerabilities, follow Microsoft's private security reporting instructions rather than opening a public issue.
+
+No cloud GPU resources or prepaid credits are involved.
