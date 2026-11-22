@@ -14,8 +14,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "research-support"))
-from agentmesh_protocol_bootstrap import install
-install()
+if os.environ.get("AEI_USE_INSTALLED_PACKAGE") != "1":
+    from agentmesh_protocol_bootstrap import install
+    install()
 from agentmesh.governance.approval_protocol import (
     ActionBinding,
     ActionTarget,
