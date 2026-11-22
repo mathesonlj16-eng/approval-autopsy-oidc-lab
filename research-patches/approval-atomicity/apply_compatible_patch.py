@@ -66,14 +66,14 @@ def patch_coordinator():
     source = path.read_text(encoding="utf-8")
     source = replace_once(
         source,
-        "from dataclasses import dataclass, field\n",
-        "import warnings\nfrom dataclasses import dataclass, field\nfrom functools import wraps\n",
+        "from dataclasses import dataclass, field\nfrom datetime import datetime, timedelta\n",
+        "import warnings\nfrom dataclasses import dataclass, field\nfrom datetime import datetime, timedelta\nfrom functools import wraps\n",
         "coordinator imports",
     )
     source = replace_once(
         source,
         "class ReasonCode:",
-        '''class _ExpiredSubmission(ApprovalProtocolError):
+        '''class _ExpiredSubmissionError(ApprovalProtocolError):
     """Internal marker: commit persisted expiry before reporting rejection."""
 
 
@@ -83,7 +83,7 @@ class ReasonCode:''',
     source = replace_once(
         source,
         'raise ApprovalProtocolError("approval request has expired")',
-        'raise _ExpiredSubmission("approval request has expired")',
+        'raise _ExpiredSubmissionError("approval request has expired")',
         "deferred expired error",
     )
     source = replace_once(
@@ -99,7 +99,7 @@ class ReasonCode:''',
             with transaction(approval_request_id):
                 try:
                     return func(self, approval_request_id, *args, **kwargs)
-                except _ExpiredSubmission as exc:
+                except _ExpiredSubmissionError as exc:
                     # Expiry records are terminal state changes, not failed writes.
                     # Commit them before raising the normal public error.
                     expired_error = exc
