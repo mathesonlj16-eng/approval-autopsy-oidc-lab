@@ -84,11 +84,11 @@ jobs:
         shell: bash
         run: |
           set -e -o pipefail
-          cp upstream-ready/agent-governance-python/agent-mesh/tests/test_approval_atomicity_research.py upstream/agent-governance-python/agent-mesh/tests/test_approval_atomicity_research.py
-          cp upstream-ready/agent-governance-python/agent-mesh/tests/test_atomicity_edge_cases.py upstream/agent-governance-python/agent-mesh/tests/test_atomicity_edge_cases.py
+          cp upstream-ready/agent-governance-python/agent-mesh/tests/test_approval_atomicity.py upstream/agent-governance-python/agent-mesh/tests/test_approval_atomicity.py
+          cp research-patches/approval-atomicity/test_atomicity_edge_cases.py upstream/agent-governance-python/agent-mesh/tests/test_atomicity_edge_cases.py
           cp upstream-ready/agent-governance-python/agent-mesh/tests/test_migration_contract.py upstream/agent-governance-python/agent-mesh/tests/test_migration_contract.py
-          cp upstream-ready/agent-governance-python/agent-mesh/tests/test_govern_integration.py upstream/agent-governance-python/agent-mesh/tests/test_govern_integration.py
-          # The copied tests are local research modifications to a temporary checkout only.
+          cp research-patches/approval-atomicity/test_govern_integration.py upstream/agent-governance-python/agent-mesh/tests/test_govern_integration.py
+          # Only the two native tests in upstream-ready are in the PR patch. The other two test modules are research-only verification.
           sha256sum upstream-ready/agent-governance-python/agent-mesh/tests/test_*.py > research-results-full/native-research-test-hashes.txt
       - name: Confirm original bug using installed package (expected fail)
         shell: bash
@@ -100,7 +100,7 @@ jobs:
           import unittest
           native = "upstream/agent-governance-python/agent-mesh/tests"
           sys.path.insert(0, native)
-          suite = unittest.defaultTestLoader.loadTestsFromName("test_approval_atomicity_research")
+          suite = unittest.defaultTestLoader.loadTestsFromName("test_approval_atomicity")
           res = unittest.TextTestRunner(verbosity=2).run(suite)
           if res.testsRun != 3 or len(res.failures) != 2 or res.errors:
               raise SystemExit(f"Unexpected baseline: run={res.testsRun}, failures={len(res.failures)}, errors={len(res.errors)}")
@@ -118,11 +118,9 @@ jobs:
             cmp "upstream-ready/$src/$name" "upstream/$src/$name"
           done
           git -C upstream add agent-governance-python/agent-mesh/src/agentmesh/governance/approval_protocol
-          git -C upstream add agent-governance-python/agent-mesh/tests/test_approval_atomicity_research.py
-          git -C upstream add agent-governance-python/agent-mesh/tests/test_atomicity_edge_cases.py
+          git -C upstream add agent-governance-python/agent-mesh/tests/test_approval_atomicity.py
           git -C upstream add agent-governance-python/agent-mesh/tests/test_migration_contract.py
-          git -C upstream add agent-governance-python/agent-mesh/tests/test_govern_integration.py
-          test "$(git -C upstream diff --cached --name-only | wc -l)" -eq 7
+          test "$(git -C upstream diff --cached --name-only | wc -l)" -eq 5
           git -C upstream diff --cached --check
           git -C upstream diff --cached --binary > research-results-full/approval-atomicity-upstream.patch
           test -s research-results-full/approval-atomicity-upstream.patch
@@ -165,7 +163,7 @@ jobs:
         run: |
           set -o pipefail
           python -m pytest -q -v \
-            upstream/agent-governance-python/agent-mesh/tests/test_approval_atomicity_research.py \
+            upstream/agent-governance-python/agent-mesh/tests/test_approval_atomicity.py \
             upstream/agent-governance-python/agent-mesh/tests/test_atomicity_edge_cases.py \
             upstream/agent-governance-python/agent-mesh/tests/test_migration_contract.py \
             upstream/agent-governance-python/agent-mesh/tests/test_govern_integration.py \
