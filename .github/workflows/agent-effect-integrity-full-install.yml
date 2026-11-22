@@ -1,0 +1,162 @@
+name: Agent Effect Integrity - installed package acceptance
+on:
+  push:
+    branches:
+      - research/agent-effect-integrity-2026-11-22
+    paths:
+      - ".github/workflows/agent-effect-integrity-full-install.yml"
+      - "research-patches/approval-atomicity/**"
+      - "research-patches/sqlite-multiprocess/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native-package-acceptance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Checkout pinned Microsoft source
+        uses: actions/checkout@v4
+        with:
+          repository: microsoft/agent-governance-toolkit
+          ref: f85abe1fffc5aaeed716a94bd6654677329215b9
+          path: upstream
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check upstream SHA and configure a local test environment
+        shell: bash
+        run: |
+          set -e -o pipefail
+          mkdir -p research-results-full
+          git -C upstream rev-parse HEAD | tee research-results-full/upstream-sha.txt
+          test "$(git -C upstream rev-parse HEAD)" = "f85abe1fffc5aaeed716a94bd6654677329215b9"
+          python -m pip install --upgrade pip
+          python -m pip install 'maturin==1.8.7' 'pytest>=9,<10' 'pytest-asyncio>=1,<2'
+      - name: Install Microsoft consolidated source and locally built ACS SDK
+        shell: bash
+        run: |
+          set -e -o pipefail
+          # Follow upstream CONTRIBUTING.md: its ACS SDK 0.4.0b0 is not yet on PyPI.
+          python -m pip install --no-cache-dir --no-deps -e ./upstream/agent-governance-python/agent-governance-toolkit-core
+          python -m pip install --no-cache-dir --no-build-isolation ./upstream/policy-engine/sdk/python
+          python -m pip install --no-cache-dir --no-deps -e ./upstream/agent-governance-python/agent-hypervisor
+          python -m pip install --no-cache-dir -e './upstream/agent-governance-python/agent-mesh[dev]'
+          python -m pip check | tee research-results-full/pip-check.txt
+          python -m pip freeze > research-results-full/pip-freeze.txt
+      - name: Verify real installed distribution and native source path
+        shell: bash
+        run: |
+          set -e -o pipefail
+          python - <<'PY' 2>&1 | tee research-results-full/installed-proof.log
+          import importlib.metadata as m
+          import inspect
+          from pathlib import Path
+          import agentmesh
+          import agentmesh.governance
+          import agentmesh.governance.approval_protocol as protocol
+          import agent_control_specification
+          from agentmesh.governance.govern import govern
+          from agentmesh.governance.approval_protocol import ApprovalCoordinator
+          print("Core installed distribution:", m.version("agent-governance-toolkit-core"))
+          print("ACS installed distribution:", m.version("agent-control-specification"))
+          print("Agentmesh module:", inspect.getfile(agentmesh))
+          print("Approval coordinator module:", inspect.getfile(ApprovalCoordinator))
+          print("Govern wrapper module:", inspect.getfile(govern))
+          print("Native SDK module:", getattr(agent_control_specification, "__file__", "<unknown>"))
+          assert m.version("agent-governance-toolkit-core") == "5.0.0"
+          assert m.version("agent-control-specification") == "0.4.0b0"
+          assert "research-support" not in str(Path(inspect.getfile(ApprovalCoordinator)))
+          assert "research-support" not in str(Path(inspect.getfile(govern)))
+          assert not hasattr(protocol, "AtomicApprovalStore"), "Baseline unexpectedly includes candidate patch"
+          PY
+      - name: Stage research tests in Microsoft's native test directory
+        shell: bash
+        run: |
+          set -e -o pipefail
+          cp research-patches/approval-atomicity/test_atomicity_regression.py upstream/agent-governance-python/agent-mesh/tests/test_approval_atomicity_research.py
+          cp research-patches/approval-atomicity/test_migration_contract.py upstream/agent-governance-python/agent-mesh/tests/test_approval_atomicity_migration_research.py
+          cp research-patches/approval-atomicity/test_govern_integration.py upstream/agent-governance-python/agent-mesh/tests/test_approval_atomicity_govern_research.py
+          # The copied tests are local research modifications to a temporary checkout only.
+          sha256sum research-patches/approval-atomicity/test_*.py > research-results-full/native-research-test-hashes.txt
+      - name: Confirm original bug using installed package (expected fail)
+        shell: bash
+        run: |
+          set -o pipefail
+          python - <<'PY' 2>&1 | tee research-results-full/installed-unpatched-regression.log
+          import os
+          import sys
+          import unittest
+          native = "upstream/agent-governance-python/agent-mesh/tests"
+          sys.path.insert(0, native)
+          suite = unittest.defaultTestLoader.loadTestsFromName("test_approval_atomicity_research")
+          res = unittest.TextTestRunner(verbosity=2).run(suite)
+          if res.testsRun != 3 or len(res.failures) != 2 or res.errors:
+              raise SystemExit(f"Unexpected baseline: run={res.testsRun}, failures={len(res.failures)}, errors={len(res.errors)}")
+          if any("chain_tampered" not in trace for _, trace in res.failures):
+              raise SystemExit("Original failure no longer matches chain_tampered hypothesis")
+          print("EXPECTED BASELINE: 1 sequential pass, 2 concurrent failures with chain_tampered")
+          PY
+      - name: Apply compatibility-aware candidate patch to source checkout
+        shell: bash
+        run: |
+          set -e -o pipefail
+          python research-patches/approval-atomicity/apply_compatible_patch.py
+          git -C upstream diff -- agent-governance-python/agent-mesh/src/agentmesh/governance/approval_protocol > research-results-full/compatible-atomicity.diff
+          test -s research-results-full/compatible-atomicity.diff
+          # Editable force-include may require regeneration of the installed consolidated wheel.
+          python -m pip install --no-cache-dir --no-deps --force-reinstall -e ./upstream/agent-governance-python/agent-governance-toolkit-core
+      - name: Check installed patched API, no bootstrap
+        shell: bash
+        run: |
+          set -e -o pipefail
+          python - <<'PY' 2>&1 | tee research-results-full/installed-patched-proof.log
+          import inspect
+          from agentmesh.governance.approval_protocol import AtomicApprovalStore, ApprovalCoordinator, InMemoryApprovalStore
+          from agentmesh.governance.govern import govern
+          assert hasattr(InMemoryApprovalStore, "approval_transaction")
+          assert hasattr(ApprovalCoordinator, "require_atomic_submission")
+          print("Installed patched coordinator:", inspect.getfile(ApprovalCoordinator))
+          print("Installed govern wrapper:", inspect.getfile(govern))
+          print("Optional atomic protocol:", AtomicApprovalStore)
+          PY
+      - name: Run research tests in Microsoft's native test directory
+        shell: bash
+        run: |
+          set -o pipefail
+          python -m pytest -q -v \
+            upstream/agent-governance-python/agent-mesh/tests/test_approval_atomicity_research.py \
+            upstream/agent-governance-python/agent-mesh/tests/test_approval_atomicity_migration_research.py \
+            upstream/agent-governance-python/agent-mesh/tests/test_approval_atomicity_govern_research.py \
+            2>&1 | tee research-results-full/native-research-tests.log
+      - name: Run Microsoft's existing approval and govern tests
+        shell: bash
+        run: |
+          set -o pipefail
+          python -m pytest -q \
+            upstream/agent-governance-python/agent-mesh/tests/test_approval_protocol.py \
+            upstream/agent-governance-python/agent-mesh/tests/test_govern_approval_coordinator.py \
+            upstream/agent-governance-python/agent-mesh/tests/test_approval_bridge.py \
+            2>&1 | tee research-results-full/native-upstream-controls.log
+      - name: Cross-process database and forced-crash checks on installed package
+        shell: bash
+        run: |
+          set -o pipefail
+          # Ensure these scripts do not install the source-only import shim.
+          # Their subprocesses inherit the same fully installed environment.
+          python research-patches/sqlite-multiprocess/run_cross_process.py patched 2>&1 | tee research-results-full/installed-cross-process.log
+          python research-patches/sqlite-multiprocess/run_crash_recovery.py patched 2>&1 | tee research-results-full/installed-crash-recovery.log
+      - name: Upload installation and regression evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-effect-integrity-installed-package
+          path: research-results-full/
+          retention-days: 14
+          if-no-files-found: warn
