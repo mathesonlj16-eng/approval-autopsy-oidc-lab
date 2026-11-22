@@ -72,6 +72,22 @@ def patch_coordinator():
     )
     source = replace_once(
         source,
+        "class ReasonCode:",
+        '''class _ExpiredSubmission(ApprovalProtocolError):
+    """Internal marker: commit persisted expiry before reporting rejection."""
+
+
+class ReasonCode:''',
+        "expired submission marker",
+    )
+    source = replace_once(
+        source,
+        'raise ApprovalProtocolError("approval request has expired")',
+        'raise _ExpiredSubmission("approval request has expired")',
+        "deferred expired error",
+    )
+    source = replace_once(
+        source,
         "@dataclass\nclass ApprovalCoordinator:",
         '''def _atomic_approval_submission(func):
     """Use atomic stores; warn for legacy stores, or reject in opt-in strict mode."""
@@ -79,8 +95,16 @@ def patch_coordinator():
     def guarded(self, approval_request_id, *args, **kwargs):
         transaction = getattr(self.store, "approval_transaction", None)
         if callable(transaction):
+            expired_error = None
             with transaction(approval_request_id):
-                return func(self, approval_request_id, *args, **kwargs)
+                try:
+                    return func(self, approval_request_id, *args, **kwargs)
+                except _ExpiredSubmission as exc:
+                    # Expiry records are terminal state changes, not failed writes.
+                    # Commit them before raising the normal public error.
+                    expired_error = exc
+            if expired_error is not None:
+                raise expired_error
         if self.require_atomic_submission:
             raise ApprovalProtocolError(
                 "approval store has no approval_transaction; strict atomic "
