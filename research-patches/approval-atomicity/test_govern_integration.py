@@ -17,7 +17,10 @@ from agentmesh.governance.approval_protocol import (
     InMemoryApprovalStore,
 )
 from agentmesh.governance.govern import GovernanceDenied, govern
-from test_migration_contract import LegacyStore
+if __package__:
+    from .test_migration_contract import LegacyStore
+else:
+    from test_migration_contract import LegacyStore
 
 POLICY = """
 apiVersion: governance.toolkit/v1
