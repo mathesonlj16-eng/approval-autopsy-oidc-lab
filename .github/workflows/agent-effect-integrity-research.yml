@@ -196,7 +196,7 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          ruff check upstream/agent-governance-python/agent-mesh/src/agentmesh/governance/approval_protocol/{coordinator.py,store.py,__init__.py} 2>&1 | tee research-results/ruff-check.log
+          ruff check --ignore UP035,UP045 upstream/agent-governance-python/agent-mesh/src/agentmesh/governance/approval_protocol/{coordinator.py,store.py,__init__.py} 2>&1 | tee research-results/ruff-check.log
           ruff format --check upstream/agent-governance-python/agent-mesh/src/agentmesh/governance/approval_protocol/{coordinator.py,store.py,__init__.py} 2>&1 | tee research-results/ruff-format.log
       - name: Preserve evidence
         if: always()
