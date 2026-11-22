@@ -1,6 +1,6 @@
 # Draft upstream contribution — atomic approval submissions
 
-**Internal preparation only. Not submitted or shared with Microsoft.**  
+**Internal preparation only. Candidate verified against the installed package; not submitted or shared with Microsoft.**  
 **Prepared:** 2026-11-22 | **Target:** Microsoft Agent Governance Toolkit, Python `agentmesh` approval protocol at `f85abe1fffc5aaeed716a94bd6654677329215b9`.
 
 ## Proposed PR title
@@ -34,7 +34,7 @@ A research-only SQLite adapter uses `BEGIN IMMEDIATE` as an example of a cross-p
 
 - [Passing pinned-source test run — 21 focused research tests and 62 original Microsoft protocol tests](https://github.com/mathesonlj16-eng/approval-autopsy-oidc-lab/actions/runs/45046899316). The run includes controlled original-failure reproduction, cross-process SQLite comparison, abrupt-worker-termination recovery, durable expiry checks, and Ruff/format validation of the changed source files.
 - [Previously passing installed-package run — 14 native tests, 76 upstream approval/govern/bridge tests](https://github.com/mathesonlj16-eng/approval-autopsy-oidc-lab/actions/runs/45045546646). This predates the latest expiry refinement.
-- Updated installed-package acceptance of the latest patch is a separate gate and must pass before describing this as a fully validated contribution.
+- [Latest passing full installed-package acceptance — 21 native research tests, 76 unchanged Microsoft tests, cross-process and expiry checks](https://github.com/mathesonlj16-eng/approval-autopsy-oidc-lab/actions/runs/45046989480). This run used the locally built ACS SDK and reinstalled the candidate patched core from source. All checks passed, including Ruff lint (excluding baseline UP035/UP045) and source formatting.
 - The workflow outputs the actual source `git diff` as an artifact. All modifications in GitHub remain on the user's separate research branch.
 
 ## Additional semantics discovered during review
