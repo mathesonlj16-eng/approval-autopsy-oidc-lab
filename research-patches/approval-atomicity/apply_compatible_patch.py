@@ -26,7 +26,7 @@ def patch_store():
     source = replace_once(
         source,
         "import threading\nfrom typing import Optional, Protocol, runtime_checkable",
-        "import threading\nfrom contextlib import contextmanager\nfrom typing import ContextManager, Optional, Protocol, runtime_checkable",
+        "import threading\nfrom contextlib import AbstractContextManager, contextmanager\nfrom typing import Optional, Protocol, runtime_checkable",
         "imports",
     )
     source = replace_once(
@@ -36,7 +36,7 @@ def patch_store():
 class AtomicApprovalStore(ApprovalStore, Protocol):
     """Optional stronger store interface. ApprovalStore stays backwards compatible."""
 
-    def approval_transaction(self, approval_request_id: str) -> ContextManager[None]:
+    def approval_transaction(self, approval_request_id: str) -> AbstractContextManager[None]:
         """Serialize a complete approval submission across all worker processes."""
         ...
 
@@ -67,7 +67,7 @@ def patch_coordinator():
     source = replace_once(
         source,
         "from dataclasses import dataclass, field\n",
-        "from dataclasses import dataclass, field\nfrom functools import wraps\nimport warnings\n",
+        "import warnings\nfrom dataclasses import dataclass, field\nfrom functools import wraps\n",
         "coordinator imports",
     )
     source = replace_once(
