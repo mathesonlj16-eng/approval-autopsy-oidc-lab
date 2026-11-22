@@ -52,7 +52,7 @@ jobs:
           assert hasattr(module, "ApprovalCoordinator")
           PY
           python -m pip freeze > research-results/pip-freeze.txt
-      - name: Run pinned-source protocol and SQLite effect integration probes
+      - name: Run protocol, effect-adapter, and concurrent-vote research probes
         shell: bash
         run: |
           set -o pipefail
@@ -64,8 +64,8 @@ jobs:
           suite = unittest.defaultTestLoader.discover("research/agent-effect-integrity", pattern="test_*.py")
           count = suite.countTestCases()
           print(f"Discovered {count} target tests", flush=True)
-          if count != 12:
-              raise SystemExit(f"Expected exactly 12 tests, got {count}")
+          if count != 14:
+              raise SystemExit(f"Expected exactly 14 tests, got {count}")
           result = unittest.TextTestRunner(verbosity=2).run(suite)
           sys.exit(0 if result.wasSuccessful() else 1)
           PY
