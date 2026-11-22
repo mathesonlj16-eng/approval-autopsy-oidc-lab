@@ -38,7 +38,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install isolated test runner
-        run: python -m pip install pytest
+        run: python -m pip install pytest 'pydantic>=2,<3' 'PyYAML>=6,<7'
       - name: Verify upstream revision and source-only import
         shell: bash
         run: |
@@ -115,8 +115,8 @@ jobs:
         shell: bash
         run: |
           set -e -o pipefail
-          python research-patches/approval-atomicity/apply_patch.py
-          git -C upstream diff -- agent-governance-python/agent-mesh/src/agentmesh/governance/approval_protocol/coordinator.py agent-governance-python/agent-mesh/src/agentmesh/governance/approval_protocol/store.py > research-results/approval-atomicity-prototype.diff
+          python research-patches/approval-atomicity/apply_compatible_patch.py
+          git -C upstream diff -- agent-governance-python/agent-mesh/src/agentmesh/governance/approval_protocol > research-results/approval-atomicity-prototype.diff
           test -s research-results/approval-atomicity-prototype.diff
           python -m compileall -q upstream/agent-governance-python/agent-mesh/src/agentmesh/governance/approval_protocol
       - name: Run regression against patched upstream code
@@ -170,6 +170,22 @@ jobs:
           from agentmesh_protocol_bootstrap import install
           install()
           sys.exit(pytest.main(["-q", "--tb=short", os.path.join(os.environ["RUNNER_TEMP"], "test_approval_protocol.py")]))
+          PY
+      - name: Verify compatible store migration and high-level govern integration
+        shell: bash
+        run: |
+          set -o pipefail
+          python - <<'PY' 2>&1 | tee research-results/patched-compatibility-and-govern.log
+          import sys, unittest
+          sys.path.insert(0, "research-support")
+          from agentmesh_protocol_bootstrap import install
+          install()
+          suite = unittest.defaultTestLoader.discover("research-patches/approval-atomicity", pattern="test_*.py")
+          count = suite.countTestCases()
+          if count != 14:
+              raise SystemExit(f"Expected 14 compatibility, govern and regression tests, discovered {count}")
+          result = unittest.TextTestRunner(verbosity=2).run(suite)
+          sys.exit(0 if result.wasSuccessful() else 1)
           PY
       - name: Preserve evidence
         if: always()
