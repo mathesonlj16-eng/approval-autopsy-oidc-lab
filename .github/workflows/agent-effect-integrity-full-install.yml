@@ -12,6 +12,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: agent-effect-integrity-full-install-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   native-package-acceptance:
     runs-on: ubuntu-latest
