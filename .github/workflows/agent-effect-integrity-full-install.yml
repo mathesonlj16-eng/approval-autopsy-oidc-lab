@@ -85,6 +85,7 @@ jobs:
         run: |
           set -e -o pipefail
           cp research-patches/approval-atomicity/test_atomicity_regression.py upstream/agent-governance-python/agent-mesh/tests/test_approval_atomicity_research.py
+          cp research-patches/approval-atomicity/test_atomicity_edge_cases.py upstream/agent-governance-python/agent-mesh/tests/test_atomicity_edge_cases.py
           cp research-patches/approval-atomicity/test_migration_contract.py upstream/agent-governance-python/agent-mesh/tests/test_migration_contract.py
           cp research-patches/approval-atomicity/test_govern_integration.py upstream/agent-governance-python/agent-mesh/tests/test_govern_integration.py
           # The copied tests are local research modifications to a temporary checkout only.
@@ -116,6 +117,12 @@ jobs:
           test -s research-results-full/compatible-atomicity.diff
           # Editable force-include may require regeneration of the installed consolidated wheel.
           python -m pip install --no-cache-dir --no-deps --force-reinstall -e ./upstream/agent-governance-python/agent-governance-toolkit-core
+      - name: Validate candidate source lint and format
+        shell: bash
+        run: |
+          set -o pipefail
+          ruff check upstream/agent-governance-python/agent-mesh/src/agentmesh/governance/approval_protocol/{coordinator.py,store.py,__init__.py} 2>&1 | tee research-results-full/ruff-check.log
+          ruff format --check upstream/agent-governance-python/agent-mesh/src/agentmesh/governance/approval_protocol/{coordinator.py,store.py,__init__.py} 2>&1 | tee research-results-full/ruff-format.log
       - name: Check installed patched API, no bootstrap
         shell: bash
         run: |
@@ -136,6 +143,7 @@ jobs:
           set -o pipefail
           python -m pytest -q -v \
             upstream/agent-governance-python/agent-mesh/tests/test_approval_atomicity_research.py \
+            upstream/agent-governance-python/agent-mesh/tests/test_atomicity_edge_cases.py \
             upstream/agent-governance-python/agent-mesh/tests/test_migration_contract.py \
             upstream/agent-governance-python/agent-mesh/tests/test_govern_integration.py \
             2>&1 | tee research-results-full/native-research-tests.log
@@ -156,6 +164,7 @@ jobs:
           # Their subprocesses inherit the same fully installed environment.
           AEI_USE_INSTALLED_PACKAGE=1 python research-patches/sqlite-multiprocess/run_cross_process.py patched 2>&1 | tee research-results-full/installed-cross-process.log
           AEI_USE_INSTALLED_PACKAGE=1 python research-patches/sqlite-multiprocess/run_crash_recovery.py patched 2>&1 | tee research-results-full/installed-crash-recovery.log
+          AEI_USE_INSTALLED_PACKAGE=1 python research-patches/sqlite-multiprocess/run_durable_expiry.py 2>&1 | tee research-results-full/installed-durable-expiry.log
       - name: Upload installation and regression evidence
         if: always()
         uses: actions/upload-artifact@v4
