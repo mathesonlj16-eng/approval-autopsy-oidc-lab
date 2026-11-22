@@ -141,7 +141,7 @@ class ApprovalCoordinator:''',
     )
     source = replace_once(
         source,
-        "        allowed_stages = {\\n            e.stage_index for e in entries if e.decision == EntryDecision.ALLOW\\n        }",
+        "        allowed_stages = {\n            e.stage_index for e in entries if e.decision == EntryDecision.ALLOW\n        }",
         "        allowed_stages = {e.stage_index for e in entries if e.decision == EntryDecision.ALLOW}",
         "upstream pre-existing formatting in touched coordinator",
     )
