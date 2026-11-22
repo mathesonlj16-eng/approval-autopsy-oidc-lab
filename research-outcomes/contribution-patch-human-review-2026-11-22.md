@@ -4,7 +4,7 @@
 
 ## Exactly what changes
 
-The patch is staged under [upstream-ready](../upstream-ready) using **native Microsoft source paths**. An automated job copies those seven normal Python files into a pristine checkout at commit **f85abe1fffc5aaeed716a94bd6654677329215b9**, runs tests, and exports a portable `git diff` artifact. This branch is **not itself a fork of Microsoft’s repository**, and it contains historical research files; use the generated isolated patch, not the whole branch, for a future upstream contribution.
+The patch is staged under [upstream-ready](../upstream-ready) using **native Microsoft source paths**. An automated job copies those five normal Python files into a pristine checkout at commit **f85abe1fffc5aaeed716a94bd6654677329215b9**, runs tests, and exports a portable `git diff` artifact. This branch is **not itself a fork of Microsoft’s repository**, and it contains historical research files; use the generated isolated patch, not the whole branch, for a future upstream contribution.
 
 Three modified files:
 
@@ -12,7 +12,7 @@ Three modified files:
 2. **`coordinator.py`** wraps complete vote submission (read prior entry, append sealed entry, resolve and update request) in the backend transaction where available. It adds `require_atomic_submission=False`; legacy custom stores continue with an explicit warning, or fail closed if strict mode is enabled. A deferred expiry exception ensures a rejected late vote can still commit its `EXPIRED` terminal resolution.
 3. **`__init__.py`** exports the optional store capability.
 
-Four new tests cover deterministic parallel-stage races, duplicate IDs, expiry/cancellation/advisory votes, legacy compatibility and strict mode, and the real `govern()` wrapper with synthetic SQLite side effects. A separate research-authored SQLite store verifies atomicity across **separate OS processes**, and worker-kill tests verify rollback.
+Two native test modules in the patch cover deterministic concurrent-stage races, legacy storage compatibility, and strict mode. Two additional research test modules are run by CI (without being included in the upstream patch) to cover duplicate IDs, expiry/cancellation/advisory votes and the real `govern()` wrapper with synthetic SQLite side effects. A separate research-authored SQLite store verifies atomicity across **separate OS processes**, and worker-kill tests verify rollback.
 
 ## Reproduced failure
 
