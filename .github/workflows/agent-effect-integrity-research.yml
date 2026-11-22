@@ -5,6 +5,7 @@ on:
       - research/agent-effect-integrity-2026-11-22
     paths:
       - "research/agent-effect-integrity/**"
+      - "research-patches/approval-atomicity/**"
       - ".github/workflows/agent-effect-integrity-research.yml"
   workflow_dispatch:
 
@@ -76,6 +77,73 @@ jobs:
           cp upstream/agent-governance-python/agent-mesh/tests/test_approval_protocol.py "${RUNNER_TEMP}/test_approval_protocol.py"
           sha256sum "${RUNNER_TEMP}/test_approval_protocol.py" | tee research-results/upstream-control-hash.txt
           python - <<'PY' 2>&1 | tee research-results/upstream-controls.log
+          import os, sys, pytest
+          sys.path.insert(0, "research-support")
+          from agentmesh_protocol_bootstrap import install
+          install()
+          sys.exit(pytest.main(["-q", "--tb=short", os.path.join(os.environ["RUNNER_TEMP"], "test_approval_protocol.py")]))
+          PY
+      - name: Prove regression fails on unmodified upstream source
+        shell: bash
+        run: |
+          set -o pipefail
+          python - <<'PY' 2>&1 | tee research-results/unpatched-regression.log
+          import sys, unittest
+          sys.path.insert(0, "research-support")
+          from agentmesh_protocol_bootstrap import install
+          install()
+          suite = unittest.defaultTestLoader.discover("research-patches/approval-atomicity", pattern="test_atomicity_regression.py")
+          result = unittest.TextTestRunner(verbosity=2).run(suite)
+          if result.testsRun != 3 or len(result.failures) != 2 or result.errors:
+              raise SystemExit("Expected exactly two prepatch concurrent-vote assertion failures and one passing control")
+          if any("chain_tampered" not in trace for _, trace in result.failures):
+              raise SystemExit("Prepatch failures were not the expected chain_tampered outcomes")
+          print("Baseline verified: both concurrent-vote variants fail with chain_tampered; sequential control passes", flush=True)
+          PY
+      - name: Apply minimal transaction patch only to ephemeral upstream checkout
+        shell: bash
+        run: |
+          set -e -o pipefail
+          python research-patches/approval-atomicity/apply_patch.py
+          git -C upstream diff -- agent-governance-python/agent-mesh/src/agentmesh/governance/approval_protocol/coordinator.py agent-governance-python/agent-mesh/src/agentmesh/governance/approval_protocol/store.py > research-results/approval-atomicity-prototype.diff
+          test -s research-results/approval-atomicity-prototype.diff
+          python -m compileall -q upstream/agent-governance-python/agent-mesh/src/agentmesh/governance/approval_protocol
+      - name: Run regression against patched upstream code
+        shell: bash
+        run: |
+          set -o pipefail
+          python - <<'PY' 2>&1 | tee research-results/patched-regression.log
+          import sys, unittest
+          sys.path.insert(0, "research-support")
+          from agentmesh_protocol_bootstrap import install
+          install()
+          suite = unittest.defaultTestLoader.discover("research-patches/approval-atomicity", pattern="test_atomicity_regression.py")
+          if suite.countTestCases() != 3:
+              raise SystemExit("Did not collect exactly three atomicity regression tests")
+          result = unittest.TextTestRunner(verbosity=2).run(suite)
+          sys.exit(0 if result.wasSuccessful() else 1)
+          PY
+      - name: Run existing protocol and effect adapter tests against patch
+        shell: bash
+        run: |
+          set -o pipefail
+          python - <<'PY' 2>&1 | tee research-results/patched-existing-tests.log
+          import sys, unittest
+          sys.path.insert(0, "research-support")
+          sys.path.insert(0, "research/agent-effect-integrity")
+          from agentmesh_protocol_bootstrap import install
+          install()
+          suite = unittest.defaultTestLoader.loadTestsFromNames(["test_agentmesh_target", "test_sqlite_effect_integration"])
+          if suite.countTestCases() != 12:
+              raise SystemExit("Expected 12 unchanged baseline/effect-adapter cases")
+          result = unittest.TextTestRunner(verbosity=2).run(suite)
+          sys.exit(0 if result.wasSuccessful() else 1)
+          PY
+      - name: Run unchanged upstream protocol suite against patch
+        shell: bash
+        run: |
+          set -o pipefail
+          python - <<'PY' 2>&1 | tee research-results/patched-upstream-tests.log
           import os, sys, pytest
           sys.path.insert(0, "research-support")
           from agentmesh_protocol_bootstrap import install
