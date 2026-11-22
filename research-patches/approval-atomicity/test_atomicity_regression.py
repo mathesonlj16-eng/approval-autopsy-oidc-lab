@@ -90,10 +90,6 @@ class ApprovalSubmissionAtomicityRegression(unittest.TestCase):
         )
         self.assertTrue(all(e.verify_digest() for e in entries))
         self.assertIsNone(entries[0].previous_entry_digest)
-        self.assertEqual(
-            entries[1].previous_entry_digest, entries[0].entry_digest,
-            "each valid approval must extend the prior entry's hash chain",
-        )
         resolution = store.get_resolution(request_id)
         self.assertIsNotNone(resolution)
         self.assertEqual(resolution.outcome, Outcome.ALLOW)
@@ -104,6 +100,10 @@ class ApprovalSubmissionAtomicityRegression(unittest.TestCase):
             current_chain_version="1",
         )
         self.assertTrue(verdict.allowed, f"execution denied: {verdict.reason_code}")
+        self.assertEqual(
+            entries[1].previous_entry_digest, entries[0].entry_digest,
+            "each valid approval must extend the prior entry's hash chain",
+        )
 
     def test_01_sequential_control(self):
         store, coord, req = self.setup_case(gated=False)
