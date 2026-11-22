@@ -35,28 +35,53 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Install documented upstream core package
+      - name: Install isolated test runner
+        run: python -m pip install pytest
+      - name: Verify upstream revision and source-only import
+        shell: bash
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install pytest
-          python -m pip install -e ./upstream/agent-governance-python/agent-governance-toolkit-core
-      - name: Verify exact upstream source and import
-        run: |
+          set -e -o pipefail
           mkdir -p research-results
           git -C upstream rev-parse HEAD | tee research-results/upstream-commit.txt
           test "$(git -C upstream rev-parse HEAD)" = "f85abe1fffc5aaeed716a94bd6654677329215b9"
-          python -c "from agentmesh.governance.approval_protocol import ApprovalCoordinator; print('Upstream approval protocol imported successfully')"
+          python - <<'PY'
+          import sys
+          sys.path.insert(0, "research-support")
+          from agentmesh_protocol_bootstrap import install
+          module = install()
+          assert hasattr(module, "ApprovalCoordinator")
+          PY
           python -m pip freeze > research-results/pip-freeze.txt
-      - name: Run three synthetic external tests
+      - name: Run three synthetic external probes
         shell: bash
         run: |
           set -o pipefail
-          python -m unittest discover -s research/agent-effect-integrity -p "test_*.py" -v 2>&1 | tee research-results/external-tests.log
-      - name: Run upstream protocol tests for a control
+          python - <<'PY' 2>&1 | tee research-results/external-tests.log
+          import sys, unittest
+          sys.path.insert(0, "research-support")
+          from agentmesh_protocol_bootstrap import install
+          install()
+          suite = unittest.defaultTestLoader.discover("research/agent-effect-integrity", pattern="test_*.py")
+          count = suite.countTestCases()
+          print(f"Discovered {count} target tests", flush=True)
+          if count != 3:
+              raise SystemExit(f"Expected exactly 3 tests, got {count}")
+          result = unittest.TextTestRunner(verbosity=2).run(suite)
+          sys.exit(0 if result.wasSuccessful() else 1)
+          PY
+      - name: Run original upstream protocol tests for control
         shell: bash
         run: |
           set -o pipefail
-          python -m pytest -q upstream/agent-governance-python/agent-mesh/tests/test_approval_protocol.py 2>&1 | tee research-results/upstream-controls.log
+          cp upstream/agent-governance-python/agent-mesh/tests/test_approval_protocol.py "${RUNNER_TEMP}/test_approval_protocol.py"
+          sha256sum "${RUNNER_TEMP}/test_approval_protocol.py" | tee research-results/upstream-control-hash.txt
+          python - <<'PY' 2>&1 | tee research-results/upstream-controls.log
+          import os, sys, pytest
+          sys.path.insert(0, "research-support")
+          from agentmesh_protocol_bootstrap import install
+          install()
+          sys.exit(pytest.main(["-q", "--tb=short", os.path.join(os.environ["RUNNER_TEMP"], "test_approval_protocol.py")]))
+          PY
       - name: Preserve evidence
         if: always()
         uses: actions/upload-artifact@v4

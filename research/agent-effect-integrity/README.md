@@ -1,27 +1,25 @@
-# Agent Effect Integrity — external conformance pilot
+# Agent Effect Integrity — pinned-source conformance pilot
 
-**Status:** research test harness, not a vulnerability report. All test subjects and effects are synthetic. The target is Microsoft's [Agent Governance Toolkit](https://github.com/microsoft/agent-governance-toolkit), Python `agentmesh` approval protocol.
+**Status:** reproducible research harness, not a vulnerability report. All actions and effects are synthetic.
 
-## Target revision
+The target is Microsoft's [Agent Governance Toolkit](https://github.com/microsoft/agent-governance-toolkit), Python `agentmesh` action-bound approval protocol at pinned revision `f85abe1fffc5aaeed716a94bd6654677329215b9`.
 
-`f85abe1fffc5aaeed716a94bd6654677329215b9` (pinned for reproducibility).
+## Test coverage
 
-## What this runner tests
+- Changing the exact action after approval is denied (**already covered upstream**).
+- Concurrent executions cannot consume the same approval more than once (**composition/control**).
+- Consuming approval and then simulating a crash before the synthetic effect leaves no effect, and retry is denied (**expected protocol boundary; not a vulnerability finding**).
 
-1. A changed action is rejected after approval. **Known upstream control.**
-2. Concurrent execution validation allows a single approval consumer. **Protocol composition.**
-3. Consuming an approval before a simulated crash and before any external effect leaves the approval consumed and effect unrecorded. **Expected contract boundary; no confirmed vulnerability.**
+The CI runner also executes the original upstream `test_approval_protocol.py` file unchanged as a control.
 
-The third scenario does not demonstrate that the Microsoft project violates a security guarantee. It helps define integration responsibilities for effect reconciliation.
+## Reproduction and limitations
 
-## Workflow and safeguards
+The first GitHub Actions attempt failed to install the full consolidated package because its declared `agent-control-specification>=0.4.0b0` dependency was not available from PyPI. That is an installation blocker, **not a security defect**.
 
-The GitHub Actions workflow runs only on changes under this research directory on the dedicated research branch. It uses read-only repository permissions and no credentials, API keys, real-world services, or external actions. The runner pins the upstream repository commit, installs the documented core Python package, executes our tests plus a small upstream control suite, and uploads logs/artifacts if a run is produced.
+The revised runner checks out the exact upstream commit and uses `research-support/agentmesh_protocol_bootstrap.py` to import only the original, unmodified approval-protocol package and its dependencies via standard Python imports, skipping the broad `agentmesh.governance` package initializer. Therefore the results apply to **the isolated protocol source**, not a fully installed or deployed Agent Governance Toolkit integration. We explicitly don't call skipped tests passes.
 
-A pass is evidence only of these synthetic tests on the pinned revision. Import errors and skipped target tests are not counted as passes. No GPU resources are used.
+GitHub Actions permissions are read-only; tests use no credentials, production tools, external writes, hosted agents, or GPUs. Runs are bounded to 15 minutes. Test logs and environment details are uploaded as artifacts where possible.
 
-Source: `agent-governance-python/agent-mesh/src/agentmesh/governance/approval_protocol`.
+## Next step
 
-## Next steps
-
-Compare our observed outcome boundary with the documented contract and existing tests; determine whether a realistic integration-level test would contribute new value. Do not submit issues or claim defects based only on the consume-before-effect result.
+After successful tests, compare the observed boundary with the upstream guarantees and select a real integration-level contract to investigate. Do not file a vulnerability report based on this baseline alone.
