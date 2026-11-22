@@ -91,6 +91,7 @@ class ReasonCode:''',
         "@dataclass\nclass ApprovalCoordinator:",
         '''def _atomic_approval_submission(func):
     """Use atomic stores; warn for legacy stores, or reject in opt-in strict mode."""
+
     @wraps(func)
     def guarded(self, approval_request_id, *args, **kwargs):
         transaction = getattr(self.store, "approval_transaction", None)
@@ -118,6 +119,7 @@ class ReasonCode:''',
             stacklevel=2,
         )
         return func(self, approval_request_id, *args, **kwargs)
+
     return guarded
 
 
@@ -136,6 +138,12 @@ class ApprovalCoordinator:''',
         "    def submit_entry(\n",
         "    @_atomic_approval_submission\n    def submit_entry(\n",
         "entry guard",
+    )
+    source = replace_once(
+        source,
+        "        allowed_stages = {\\n            e.stage_index for e in entries if e.decision == EntryDecision.ALLOW\\n        }",
+        "        allowed_stages = {e.stage_index for e in entries if e.decision == EntryDecision.ALLOW}",
+        "upstream pre-existing formatting in touched coordinator",
     )
     path.write_text(source, encoding="utf-8")
 
